@@ -2,10 +2,10 @@
 title: Autoscale GPU Workloads on AKS Using DCGM Metrics and KEDA
 description: Learn how to autoscale GPU-based workloads on Azure Kubernetes Service (AKS) using DCGM Metrics and KEDA
 author: dcasati
-ms.author: dcasati
+ms.author: sachidesai
 ms.date: 05/16/2025
 ms.topic: how-to
-ms.custom: devx-track-azurecli
+ms.service: azure-kubernetes-service
 ---
 
 # Autoscale GPU Workloads on AKS Using DCGM Metrics and KEDA
@@ -60,7 +60,19 @@ export USER_ASSIGNED_CLIENT_ID="$(az identity show --resource-group $RESOURCE_GR
 
 ## Create the KEDA Scaler Manifest
 
-This manifest creates the `TriggerAuthentication` and `ScaledObject` for autoscaling based on GPU utilization.
+This manifest creates the `TriggerAuthentication` and `ScaledObject` for autoscaling based on GPU utilization using the `DCGM_FI_DEV_GPU_UTIL` metric.
+
+> [!NOTE] 
+> This example uses the `DCGM_FI_DEV_GPU_UTIL` metric, which measures GPU utilization. Other metrics are also available from the DCGM exporter depending on your workload requirements. For a complete list of available metrics, refer to the [NVIDIA DCGM Exporter documentation](https://github.com/NVIDIA/dcgm-exporter#metrics).
+
+| Field                 | Description                                                                                                                                                                                       |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `metricName`          | Specifies the GPU metric to monitor. `DCGM_FI_DEV_GPU_UTIL` reports the percentage of time the GPU is actively processing workloads. This value typically ranges from 0 to 100.                   |
+| `query`               | PromQL query that calculates the average GPU utilization across all pods in the deployment `my-gpu-workload`. This ensures scaling decisions are based on overall GPU usage, not a single pod.    |
+| `threshold`           | The target average GPU utilization percentage that triggers scaling. If the average exceeds **5%**, the scaler increases the number of pod replicas.                                              |
+| `activationThreshold` | The minimum average GPU utilization required to activate scaling. If the utilization is below **2%**, scaling actions will not occur, preventing unnecessary scaling during low activity periods. |
+
+Create the KEDA manifest
 
 ```bash
 cat <<EOF > keda-gpu-scaler-prometheus.yaml
@@ -95,7 +107,7 @@ spec:
 EOF
 ```
 
-Apply the KEDA Manifest
+Apply it
 
 ```bash
 kubectl apply -f keda-gpu-scaler-prometheus.yaml
